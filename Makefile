@@ -119,7 +119,7 @@ mkfs/mkfs: mkfs/mkfs.c $K/fs.h
 # http://www.gnu.org/software/make/manual/html_node/Chained-Rules.html
 .PRECIOUS: %.o
 
-UPROGS=
+UPROGS=\
 	$U/_cat
 	$U/_echo
 	$U/_forktest
