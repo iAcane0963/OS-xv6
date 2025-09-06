@@ -690,3 +690,17 @@ procdump(void)
     printf("\n");
   }
 }
+
+int
+proc_count(void)
+{
+  int count = 0;
+  struct proc *p;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+    if(p->state != UNUSED) {
+      count++;
+    }
+  }
+  return count;
+}

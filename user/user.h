@@ -1,5 +1,6 @@
 struct stat;
 struct rtcdate;
+struct sysinfo;
 
 // system calls
 int fork(void);
@@ -24,6 +25,8 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int ntas();
+int trace(int);
+int sysinfo(struct sysinfo*);
 int crash(const char*, int);
 int mount(char*, char *);
 int umount(char*);
