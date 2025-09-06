@@ -1,0 +1,23 @@
+1. Which registers contain arguments to functions? For example, which register holds 13 in main's call to printf?
+Answer: Arguments are passed in registers a0, a1, a2, etc. In main's call to printf, the value 13 is loaded into register a2 by the instruction `li a2, 13`.
+
+2. Where is the call to function f in the assembly code for main? Where is the call to g? (Hint: the compiler may inline functions.)
+Answer: There are no calls to f or g in the assembly. The compiler optimized the code by performing constant folding. It calculated the result of f(8)+1 at compile time to be 12, and loaded this value directly into register a1 with the instruction `li a1, 12`.
+
+3. At what address is the function printf located?
+Answer: The call to printf is `jalr 1536(ra) # 630 <printf>`. The comment indicates that printf is located at address 0x630.
+
+4. What value is in the register ra just after the jalr to printf in main?
+Answer: The `jalr` instruction is at address 0x34. It stores the address of the next instruction, 0x38, in the `ra` (return address) register.
+
+5. Run the following code. What is the output?
+   unsigned int i = 0x00646c72;
+   printf("H%x Wo%s", 57616, &i);
+Answer: The output is "He110 World". This is because 57616 in hex is 0xe110. On a little-endian machine, the integer 0x00646c72 is stored in memory as the byte sequence 72, 6c, 64, 00. This sequence corresponds to the ASCII string "rld" followed by a null terminator. So, "Wo" + "rld" gives "World".
+
+6. If the RISC-V were instead big-endian what would you set i to in order to yield the same output? Would you need to change 57616 to a different value?
+Answer: To get the byte sequence 72, 6c, 64, 00 in memory on a big-endian machine, you would need to set i to 0x726c6400. The integer value 57616 is independent of endianness and would not need to be changed.
+
+7. In the following code, what is going to be printed after 'y=' ? (note: the answer is not a specific value.) Why does this happen?
+   printf("x=%d y=%d", 3);
+Answer: In the specific context of the provided call.c, it will print y=13. This happens because printf expects a second integer argument for the second %d, which should be in register a2. Since no argument was provided, printf reads whatever value was previously left in a2. In the main function of call.c, the instruction `li a2, 13` is executed just before the relevant printf call, so a2 still holds the value 13.

@@ -110,4 +110,10 @@ struct proc {
   char name[16];               // Process name (debugging)
   int trace_mask;              // Trace mask for system calls
   struct usyscall *usyscall;   // Page shared with user space
+
+  // for sigalarm
+  int alarm_interval;
+  uint64 alarm_handler;
+  int ticks_passed;
+  struct trapframe *saved_tf;
 };

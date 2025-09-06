@@ -61,6 +61,9 @@ sys_sleep(void)
 
   if(argint(0, &n) < 0)
     return -1;
+
+  backtrace();
+
   acquire(&tickslock);
   ticks0 = ticks;
   while(ticks - ticks0 < n){
@@ -151,4 +154,39 @@ sys_pgaccess(void)
     return -1;
 
   return 0;
+}
+
+uint64
+sys_sigalarm(void)
+{
+  int interval;
+  uint64 handler;
+  struct proc *p = myproc();
+
+  if(argint(0, &interval) < 0 || argaddr(1, &handler) < 0)
+    return -1;
+
+  p->alarm_interval = interval;
+  p->alarm_handler = handler;
+  p->ticks_passed = 0;
+  
+  return 0;
+}
+
+uint64
+sys_sigreturn(void)
+{
+  struct proc *p = myproc();
+
+  if(p->saved_tf == 0)
+    return -1;
+
+  // Restore the trapframe
+  *(p->tf) = *(p->saved_tf);
+
+  // Free the saved trapframe and clear the pointer
+  kfree(p->saved_tf);
+  p->saved_tf = 0;
+
+  return p->tf->a0; // Return the original return value
 }

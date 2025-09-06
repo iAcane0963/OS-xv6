@@ -3,7 +3,7 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
-int g(int x) {
+int __attribute__((noinline)) g(int x) {
   return x+3;
 }
 

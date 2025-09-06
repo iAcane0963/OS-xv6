@@ -80,8 +80,23 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2) {
+    // Handle alarm ticks
+    if(p->alarm_interval > 0) {
+      p->ticks_passed++;
+      if(p->ticks_passed >= p->alarm_interval) {
+        if(p->saved_tf == 0) { // Only if no alarm is already in progress
+          p->saved_tf = kalloc();
+          if(p->saved_tf){
+            *(p->saved_tf) = *(p->tf); // Save the trapframe
+            p->tf->epc = p->alarm_handler; // Set PC to the handler
+            p->ticks_passed = 0;
+          }
+        }
+      }
+    }
     yield();
+  }
 
   usertrapret();
 }

@@ -38,9 +38,9 @@ OBJS = \
 
 # Try to infer the correct TOOLPREFIX if not set
 ifndef TOOLPREFIX
-TOOLPREFIX := $(shell if riscv64-unknown-elf-objdump -i 2>&1 | grep 'elf64-big' >/dev/null 2>&1;
+TOOLPREFIX := $(shell if riscv64-unknown-elf-objdump -i 2>&1 | grep 'elf64-big' >/dev/null 2>&1;\
 	then echo 'riscv64-unknown-elf-'; \
-	elif riscv64-linux-gnu-objdump -i 2>&1 | grep 'elf64-big' >/dev/null 2>&1;
+	elif riscv64-linux-gnu-objdump -i 2>&1 | grep 'elf64-big' >/dev/null 2>&1;\
 	then echo 'riscv64-linux-gnu-'; \
 	else echo "***" 1>&2; \
 	echo "*** Error: Couldn't find an riscv64 version of GCC/binutils." 1>&2; \
@@ -72,6 +72,9 @@ CFLAGS += -fno-pie -nopie
 endif
 
 LDFLAGS = -z max-page-size=4096
+
+%.o: %.S
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 $K/kernel: $(OBJS) $K/kernel.ld $U/initcode
 	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS) 
@@ -120,37 +123,38 @@ mkfs/mkfs: mkfs/mkfs.c $K/fs.h
 .PRECIOUS: %.o
 
 UPROGS=\
-	$U/_cat
-	$U/_echo
-	$U/_forktest
-	$U/_grep
-	$U/_init
-	$U/_kill
-	$U/_ln
-	$U/_ls
-	$U/_mkdir
-	$U/_rm
-	$U/_sh
-	$U/_stressfs
-	$U/_usertests
-	$U/_wc
-	$U/_zombie
-	$U/_cowtest
-	$U/_uthread
-	$U/_call
-	$U/_testsh
-	$U/_kalloctest
-	$U/_bcachetest
-	$U/_alloctest
-	$U/_bigfile
-	$U/_sleep
-	$U/_pingpong
-	$U/_primes
-	$U/_find
-	$U/_xargs
-	$U/_trace
-	$U/_sysinfotest
-	$U/_pgaccesstest
+	$U/_cat\
+	$U/_echo\
+	$U/_forktest\
+	$U/_grep\
+	$U/_init\
+	$U/_kill\
+	$U/_ln\
+	$U/_ls\
+	$U/_mkdir\
+	$U/_rm\
+	$U/_sh\
+	$U/_stressfs\
+	$U/_usertests\
+	$U/_wc\
+	$U/_zombie\
+	$U/_cowtest\
+	$U/_uthread\
+	$U/_call\
+	$U/_testsh\
+	$U/_kalloctest\
+	$U/_bcachetest\
+	$U/_alloctest\
+	$U/_bigfile\
+	$U/_sleep\
+	$U/_pingpong\
+	$U/_primes\
+	$U/_find\
+	$U/_xargs\
+	$U/_trace\
+	$U/_sysinfotest\
+	$U/_pgaccesstest\
+	$U/_alarmtest
 
 fs.img: mkfs/mkfs README user/xargstest.sh $(UPROGS)
 	mkfs/mkfs fs.img README user/xargstest.sh $(UPROGS)

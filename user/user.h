@@ -44,6 +44,8 @@ int ntas();
 int trace(int);
 int sysinfo(struct sysinfo*);
 int pgaccess(void*, int, void*);
+int sigalarm(int, void(*)());
+int sigreturn(void);
 int crash(const char*, int);
 int mount(char*, char *);
 int umount(char*);
