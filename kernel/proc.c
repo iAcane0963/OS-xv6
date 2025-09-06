@@ -282,9 +282,6 @@ fork(void)
   }
   np->sz = p->sz;
 
-  printf("fork() printing pagetable for pid %d\n", np->pid);
-  vmprint(np->pagetable);
-
   np->parent = p;
 
   // copy saved user registers.
