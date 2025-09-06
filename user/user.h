@@ -1,3 +1,19 @@
+// From kernel/param.h
+#define PGSIZE 4096
+
+// From kernel/riscv.h
+#define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
+
+// From kernel/memlayout.h
+#define TRAMPOLINE (MAXVA - PGSIZE)
+#define TRAPFRAME (TRAMPOLINE - PGSIZE)
+#define USYSCALL (TRAPFRAME - PGSIZE)
+
+// From kernel/proc.h
+struct usyscall {
+  int pid;
+};
+
 struct stat;
 struct rtcdate;
 struct sysinfo;
@@ -27,6 +43,7 @@ int uptime(void);
 int ntas();
 int trace(int);
 int sysinfo(struct sysinfo*);
+int pgaccess(void*, int, void*);
 int crash(const char*, int);
 int mount(char*, char *);
 int umount(char*);

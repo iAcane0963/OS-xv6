@@ -3,6 +3,13 @@
 #include "kernel/fcntl.h"
 #include "user/user.h"
 
+int
+getpid(void)
+{
+  struct usyscall *u = (struct usyscall *)USYSCALL;
+  return u->pid;
+}
+
 char*
 strcpy(char *s, const char *t)
 {

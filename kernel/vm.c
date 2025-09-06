@@ -118,6 +118,15 @@ walkaddr(pagetable_t pagetable, uint64 va)
   return pa;
 }
 
+pte_t *
+walk_pte(pagetable_t pagetable, uint64 va)
+{
+  if(va >= MAXVA)
+    return 0;
+
+  return walk(pagetable, va, 0);
+}
+
 // add a mapping to the kernel page table.
 // only used when booting.
 // does not flush TLB or enable paging.
@@ -189,21 +198,18 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
   for(;;){
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0){
-      printf("va=%p pte=%p\n", a, *pte);
-      panic("uvmunmap: not mapped");
+    if((*pte & PTE_V) != 0){
+      if(PTE_FLAGS(*pte) == PTE_V)
+        panic("uvmunmap: not a leaf");
+      if(do_free){
+        pa = PTE2PA(*pte);
+        kfree((void*)pa);
+      }
+      *pte = 0;
     }
-    if(PTE_FLAGS(*pte) == PTE_V)
-      panic("uvmunmap: not a leaf");
-    if(do_free){
-      pa = PTE2PA(*pte);
-      kfree((void*)pa);
-    }
-    *pte = 0;
     if(a == last)
       break;
     a += PGSIZE;
-    pa += PGSIZE;
   }
 }
 
@@ -450,4 +456,29 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+void
+vmprint_level(pagetable_t pagetable, int level)
+{
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+    if(pte & PTE_V){
+      for (int j = 0; j < level; j++) {
+        printf(".. ");
+      }
+      printf("..%d: pte %p pa %p\n", i, pte, PTE2PA(pte));
+      if((pte & (PTE_R|PTE_W|PTE_X)) == 0){
+        uint64 child = PTE2PA(pte);
+        vmprint_level((pagetable_t)child, level + 1);
+      }
+    }
+  }
+}
+
+void
+vmprint(pagetable_t pagetable)
+{
+  printf("page table %p\n", pagetable);
+  vmprint_level(pagetable, 1);
 }

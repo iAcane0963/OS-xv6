@@ -149,7 +149,8 @@ UPROGS=\
 	$U/_find\
 	$U/_xargs\
 		$U/_trace\
-	$U/_sysinfotest
+	$U/_sysinfotest\
+	$U/_pgaccesstest
 
 fs.img: mkfs/mkfs README user/xargstest.sh $(UPROGS)
 	mkfs/mkfs fs.img README user/xargstest.sh $(UPROGS)

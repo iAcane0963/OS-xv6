@@ -32,10 +32,11 @@ entry("link");
 entry("mkdir");
 entry("chdir");
 entry("dup");
-entry("getpid");
+
 entry("sbrk");
 entry("sleep");
 entry("uptime");
 entry("ntas");
 entry("trace");
 entry("sysinfo");
+entry("pgaccess");

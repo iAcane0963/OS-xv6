@@ -117,6 +117,24 @@ found:
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
 
+  // Allocate and map USYSCALL page.
+  char *pa;
+  if((pa = kalloc()) == 0){
+    proc_freepagetable(p->pagetable, 0);
+    kfree(p->tf);
+    release(&p->lock);
+    return 0;
+  }
+  p->usyscall = (struct usyscall*)pa;
+  p->usyscall->pid = p->pid;
+  if(mappages(p->pagetable, USYSCALL, PGSIZE, (uint64)pa, PTE_R | PTE_U) < 0){
+    kfree(pa);
+    proc_freepagetable(p->pagetable, 0);
+    kfree(p->tf);
+    release(&p->lock);
+    return 0;
+  }
+
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof p->context);
@@ -179,6 +197,7 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
   uvmunmap(pagetable, TRAMPOLINE, PGSIZE, 0);
   uvmunmap(pagetable, TRAPFRAME, PGSIZE, 0);
+  uvmunmap(pagetable, USYSCALL, PGSIZE, 1);
   if(sz > 0)
     uvmfree(pagetable, sz);
 }
@@ -262,6 +281,9 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+
+  printf("fork() printing pagetable for pid %d\n", np->pid);
+  vmprint(np->pagetable);
 
   np->parent = p;
 
