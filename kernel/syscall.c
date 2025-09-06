@@ -107,6 +107,7 @@ extern uint64 sys_uptime(void);
 extern uint64 sys_ntas(void);
 extern uint64 sys_trace(void);
 extern uint64 sys_sysinfo(void);
+extern uint64 sys_pgaccess(void);
 
 static char *syscall_names[] = {
   [SYS_fork]    "fork",
@@ -133,6 +134,7 @@ static char *syscall_names[] = {
   [SYS_ntas]    "ntas",
   [SYS_trace]   "trace",
   [SYS_sysinfo] "sysinfo",
+  [SYS_pgaccess] "pgaccess",
 };
 
 static uint64 (*syscalls[])(void) = {
@@ -160,6 +162,7 @@ static uint64 (*syscalls[])(void) = {
 [SYS_ntas]    sys_ntas,
 [SYS_trace]   sys_trace,
 [SYS_sysinfo] sys_sysinfo,
+[SYS_pgaccess] sys_pgaccess,
 };
 
 void

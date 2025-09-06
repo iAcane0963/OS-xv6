@@ -124,3 +124,31 @@ sys_sysinfo(void)
 
   return 0;
 }
+
+uint64
+sys_pgaccess(void)
+{
+  uint64 start_addr, user_buf;
+  int num_pages;
+  struct proc *p = myproc();
+  int mask = 0;
+
+  if(argaddr(0, &start_addr) < 0 || argint(1, &num_pages) < 0 || argaddr(2, &user_buf) < 0)
+    return -1;
+
+  if (num_pages > 32)
+    return -1;
+
+  for (int i = 0; i < num_pages; i++) {
+    pte_t *pte = walk_pte(p->pagetable, start_addr + i * PGSIZE);
+    if (pte != 0 && (*pte & PTE_A)) {
+      mask |= (1 << i);
+      *pte &= ~PTE_A; // Clear the accessed bit
+    }
+  }
+
+  if (copyout(p->pagetable, user_buf, (char *)&mask, sizeof(mask)) < 0)
+    return -1;
+
+  return 0;
+}
