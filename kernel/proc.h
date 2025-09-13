@@ -80,18 +80,18 @@ struct trapframe {
   /* 280 */ uint64 t6;
 };
 
-// Virtual Memory Area - lab10
+// Virtual Memory Area - for mmap lab
 struct vm_area {
-    uint64 addr;    // mmap address
-    int len;    // mmap memory length
-    int prot;   // permission
-    int flags;  // the mmap flags
-    int offset; // the file offset
-    struct file* f;     // pointer to the mapped file
+    uint64 addr;    // 映射区域的起始虚拟地址
+    int len;        // 映射区域的长度
+    int prot;       // 内存保护权限 (PROT_READ, PROT_WRITE, etc.)
+    int flags;      // 映射标志 (MAP_SHARED, MAP_PRIVATE)
+    int offset;     // 文件中的偏移量
+    struct file* f; // 指向被映射文件的指针
 };
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
-#define NVMA 16     // the number of VMA in a process - lab10
+#define NVMA 16     // 每个进程最多允许的 VMA 数量
 // Per-process state
 struct proc {
   struct spinlock lock;
@@ -115,6 +115,6 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
-  struct vm_area vma[NVMA];    // VMA array - lab10
+  struct vm_area vma[NVMA];    // 进程的 VMA 数组
 };
 

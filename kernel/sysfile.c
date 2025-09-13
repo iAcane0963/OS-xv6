@@ -498,56 +498,61 @@ uint64 sys_mmap(void) {
   struct proc *p = myproc();
   int i;
 
+  // 1. 获取用户传入的 mmap 参数
   if (argaddr(0, &addr) < 0 || argint(1, &len) < 0
       || argint(2, &prot) < 0 || argint(3, &flags) < 0
       || argfd(4, 0, &f) < 0 || argint(5, &offset) < 0) {
     return -1;
   }
+
+  // 2. 参数合法性检查
   if (flags != MAP_SHARED && flags != MAP_PRIVATE) {
     return -1;
   }
-  // the file must be written when flag is MAP_SHARED
+  // 如果是 MAP_SHARED 并且要求可写，那么文件本身也必须是可写的
   if (flags == MAP_SHARED && f->writable == 0 && (prot & PROT_WRITE)) {
     return -1;
   }
-  // offset must be a multiple of the page size
-  if (len < 0 || offset < 0 || offset % PGSIZE) {
+  // 长度和偏移量必须合法
+  if (len <= 0 || offset < 0 || offset % PGSIZE != 0) {
     return -1;
   }
 
-  // allocate a VMA for the mapped memory
+  // 3. 为这次映射分配一个 VMA 结构体
   for (i = 0; i < NVMA; ++i) {
-    if (!p->vma[i].addr) {
+    if (p->vma[i].addr == 0) { // 找到一个空闲的 VMA
       vma = &p->vma[i];
       break;
     }
   }
-  if (!vma) {
+  if (!vma) { // 如果没有空闲的 VMA
     return -1;
   }
 
-  // assume that addr will always be 0, the kernel
-  //choose the page-aligned address at which to create
-  //the mapping
-  addr = MMAPMINADDR;
+  // 4. 选择映射的虚拟地址
+  // 实验简化：总是由内核来选择地址，忽略用户传入的 addr 参数
+  addr = MMAPMINADDR; // 从一个预设的最小地址开始寻找
   for (i = 0; i < NVMA; ++i) {
     if (p->vma[i].addr) {
-      // get the max address of the mapped memory
+      // 找到当前所有 VMA 的最高地址，在其基础上继续向上分配
       addr = max(addr, p->vma[i].addr + p->vma[i].len);
     }
   }
-  addr = PGROUNDUP(addr);
-  if (addr + len > TRAPFRAME) {
+  addr = PGROUNDUP(addr); // 向上页对齐
+  if (addr + len > TRAPFRAME) { // 检查是否超出用户空间范围
     return -1;
   }
+
+  // 5. 初始化 VMA 结构体
   vma->addr = addr;
   vma->len = len;
   vma->prot = prot;
   vma->flags = flags;
   vma->offset = offset;
   vma->f = f;
-  filedup(f);     // increase the file's reference count
+  filedup(f);     // 增加文件的引用计数，因为 VMA 持有它
 
+  // 6. 返回映射的起始地址
   return addr;
 }
 
@@ -560,14 +565,15 @@ uint64 sys_munmap(void) {
   uint maxsz, n, n1;
   int i;
 
+  // 1. 获取用户传入的 munmap 参数
   if (argaddr(0, &addr) < 0 || argint(1, &len) < 0) {
     return -1;
   }
-  if (addr % PGSIZE || len < 0) {
+  if (addr % PGSIZE || len < 0) { // 地址必须页对齐
     return -1;
   }
 
-  // find the VMA
+  // 2. 找到地址范围对应的 VMA
   for (i = 0; i < NVMA; ++i) {
     if (p->vma[i].addr && addr >= p->vma[i].addr
         && addr + len <= p->vma[i].addr + p->vma[i].len) {
@@ -575,7 +581,7 @@ uint64 sys_munmap(void) {
       break;
     }
   }
-  if (!vma) {
+  if (!vma) { // 未找到对应的 VMA
     return -1;
   }
 
@@ -583,14 +589,16 @@ uint64 sys_munmap(void) {
     return 0;
   }
 
+  // 3. 如果是 MAP_SHARED 映射，需要将脏页写回文件
   if ((vma->flags & MAP_SHARED)) {
-    // the max size once can write to the disk
+    // 每次事务能写入的最大尺寸
     maxsz = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
     for (va = addr; va < addr + len; va += PGSIZE) {
+      // 检查页表项的 Dirty 位，判断页面是否被修改过
       if (uvmgetdirty(p->pagetable, va) == 0) {
-        continue;
+        continue; // 如果不是脏页，则跳过
       }
-      // only write the dirty page back to the mapped file
+      // 将脏页分块写回文件
       n = min(PGSIZE, addr + len - va);
       for (i = 0; i < n; i += n1) {
         n1 = min(maxsz, n - i);
@@ -606,23 +614,26 @@ uint64 sys_munmap(void) {
       }
     }
   }
+
+  // 4. 取消虚拟地址的映射
   uvmunmap(p->pagetable, addr, (len - 1) / PGSIZE + 1, 1);
-  // update the vma
-  if (addr == vma->addr && len == vma->len) {
-    vma->addr = 0;
+
+  // 5. 更新 VMA 结构体
+  if (addr == vma->addr && len == vma->len) { // 如果整个 VMA 都被 unmap
+    vma->addr = 0; // 清空 VMA，使其可被复用
     vma->len = 0;
     vma->offset = 0;
     vma->flags = 0;
     vma->prot = 0;
-    fileclose(vma->f);
+    fileclose(vma->f); // 减少文件引用计数
     vma->f = 0;
-  } else if (addr == vma->addr) {
+  } else if (addr == vma->addr) { // 如果是从 VMA 的开头 unmap 一部分
     vma->addr += len;
     vma->offset += len;
     vma->len -= len;
-  } else if (addr + len == vma->addr + vma->len) {
+  } else if (addr + len == vma->addr + vma->len) { // 如果是从 VMA 的末尾 unmap 一部分
     vma->len -= len;
-  } else {
+  } else { // 不支持从 VMA 中间 unmap
     panic("unexpected munmap");
   }
   return 0;

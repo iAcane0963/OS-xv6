@@ -71,54 +71,66 @@ usertrap(void)
     syscall();
   } else if (r_scause() == 12 || r_scause() == 13
              || r_scause() == 15) {
-    // mmap page fault - lab10
+    // --- mmap 核心修改：处理缺页中断 ---
+    // scause 12: 指令缺页中断 (Instruction page fault)
+    // scause 13: 读缺页中断 (Load page fault)
+    // scause 15: 写缺页中断 (Store page fault)
     char *pa;
-    uint64 va = PGROUNDDOWN(r_stval());
+    uint64 va = PGROUNDDOWN(r_stval()); // 获取导致缺页的虚拟地址，并向下页对齐
     struct vm_area *vma = 0;
     int flags = PTE_U;
     int i;
-    // find the VMA
+
+    // 1. 在当前进程的 VMA 列表中查找包含 va 的区域
     for (i = 0; i < NVMA; ++i) {
-      // like the Linux mmap, it can modify the remaining bytes in
-      //the end of mapped page
       if (p->vma[i].addr && va >= p->vma[i].addr
           && va < p->vma[i].addr + p->vma[i].len) {
         vma = &p->vma[i];
         break;
       }
     }
-    if (!vma) {
+    if (!vma) { // 如果地址不属于任何 VMA，则判定为非法访问
       goto err;
     }
-    // set write flag and dirty flag to the mapped page's PTE
+
+    // 2. 处理写缺页中断（针对已映射的只读页面）
+    // 如果是写中断(15)，且页面要求可写(PROT_WRITE)，且页面已存在(walkaddr成功)
     if (r_scause() == 15 && (vma->prot & PROT_WRITE)
         && walkaddr(p->pagetable, va)) {
+      // 这种情况对应于 COW (Copy-on-Write) 或者设置脏位
+      // 在这个实验的简化模型中，我们直接设置页面的“脏”位和“可写”位
       if (uvmsetdirtywrite(p->pagetable, va)) {
         goto err;
       }
     } else {
+      // 3. 处理首次访问缺页（读、写或执行）
+      // 分配一页物理内存
       if ((pa = kalloc()) == 0) {
         goto err;
       }
       memset(pa, 0, PGSIZE);
+      // 从文件中读取相应内容到新分配的物理页中
       ilock(vma->f->ip);
       if (readi(vma->f->ip, 0, (uint64) pa, va - vma->addr + vma->offset, PGSIZE) < 0) {
         iunlock(vma->f->ip);
+        kfree(pa);
         goto err;
       }
       iunlock(vma->f->ip);
+
+      // 根据 VMA 的权限设置页表项(PTE)的标志位
       if ((vma->prot & PROT_READ)) {
         flags |= PTE_R;
-      }
-      // only store page fault and the mapped page can be written
-      //set the PTE write flag and dirty flag otherwise don't set
-      //these two flag until next store page falut
-      if (r_scause() == 15 && (vma->prot & PROT_WRITE)) {
-        flags |= PTE_W | PTE_D;
       }
       if ((vma->prot & PROT_EXEC)) {
         flags |= PTE_X;
       }
+      // 如果是写缺页中断，并且 VMA 允许写入，则同时设置 PTE 的可写(W)和脏(D)位
+      if (r_scause() == 15 && (vma->prot & PROT_WRITE)) {
+        flags |= PTE_W | PTE_D;
+      }
+
+      // 4. 将物理页映射到虚拟地址
       if (mappages(p->pagetable, va, PGSIZE, (uint64) pa, flags) != 0) {
         kfree(pa);
         goto err;

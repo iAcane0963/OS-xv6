@@ -302,10 +302,11 @@ fork(void)
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
 
-  // copy all of VMA - lab10
+  // 为 mmap 实验进行的修改：复制父进程的所有 VMA 到子进程
   for (i = 0; i < NVMA; ++i) {
     if (p->vma[i].addr) {
       np->vma[i] = p->vma[i];
+      // 增加对应文件的引用计数
       filedup(np->vma[i].f);
     }
   }
@@ -354,7 +355,6 @@ void
 exit(int status)
 {
   struct proc *p = myproc();
-  // lab10
   int i;
   struct vm_area* vma;
   uint maxsz = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
@@ -364,17 +364,19 @@ exit(int status)
   if(p == initproc)
     panic("init exiting");
 
-  // unmap the mapped memory - lab10
+  // 为 mmap 实验进行的修改：在进程退出时，处理所有 VMA
   for (i = 0; i < NVMA; ++i) {
-    if (p->vma[i].addr == 0) {
+    if (p->vma[i].addr == 0) { // 跳过未使用的 VMA
       continue;
     }
     vma = &p->vma[i];
+    // 如果是共享映射，需要将脏页写回文件
     if ((vma->flags & MAP_SHARED)) {
       for (va = vma->addr; va < vma->addr + vma->len; va += PGSIZE) {
-        if (uvmgetdirty(p->pagetable, va) == 0) {
+        if (uvmgetdirty(p->pagetable, va) == 0) { // 检查脏位
           continue;
         }
+        // 将脏页分块写回文件
         n = min(PGSIZE, vma->addr + vma->len - va);
         for (r = 0; r < n; r += n1) {
           n1 = min(maxsz, n - i);
@@ -390,13 +392,15 @@ exit(int status)
         }
       }
     }
+    // 取消 VMA 区域的映射
     uvmunmap(p->pagetable, vma->addr, (vma->len - 1) / PGSIZE + 1, 1);
+    // 清理 VMA 结构体
     vma->addr = 0;
     vma->len = 0;
     vma->offset = 0;
     vma->flags = 0;
     vma->offset = 0;
-    fileclose(vma->f);
+    fileclose(vma->f); // 减少文件引用计数
     vma->f = 0;
   }
 
