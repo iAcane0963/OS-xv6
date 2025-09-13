@@ -9,8 +9,10 @@
 #include "riscv.h"
 #include "defs.h"
 
-// the reference count of physical memory page
+// 为 COW 实验添加：每个物理页的引用计数字段。
+// 数组的索引是物理地址除以 PGSIZE，即物理页号。
 int useReference[PHYSTOP/PGSIZE];
+// 为保护引用计数数组的并发访问而设立的锁。
 struct spinlock ref_count_lock;
 
 void freerange(void *pa_start, void *pa_end);
@@ -31,6 +33,8 @@ void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
+  // 为 COW 实验添加：初始化引用计数的锁
+  initlock(&ref_count_lock, "ref_count_lock");
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -55,15 +59,20 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
+  // 为 COW 实验进行的修改：
+  // 在释放页面前，先检查其引用计数。
   int temp;
   acquire(&ref_count_lock);
-  // decrease the reference count, if use reference is not zero, then return
+  // 对应页面的引用计数减1。
   useReference[(uint64)pa/PGSIZE] -= 1;
   temp = useReference[(uint64)pa/PGSIZE];
   release(&ref_count_lock);
+  // 如果引用计数仍然大于0，说明还有其他进程在使用此页面，
+  // 此时不能释放，直接返回。
   if (temp > 0)
     return;
 
+  // 只有当引用计数为0时，才真正地释放物理页面。
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
@@ -87,8 +96,9 @@ kalloc(void)
   r = kmem.freelist;
   if(r){
     kmem.freelist = r->next;
+    // 为 COW 实验进行的修改：
+    // 当分配一个新页面时，将其引用计数初始化为1。
     acquire(&ref_count_lock);
-    // initialization the ref count to 1
     useReference[(uint64)r / PGSIZE] = 1;
     release(&ref_count_lock);
   }

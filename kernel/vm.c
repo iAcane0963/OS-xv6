@@ -309,42 +309,40 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  // char *mem;
 
+  // 遍历父进程的用户空间内存
  for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
-    // PAY ATTENTION!!!
-    // 只有父进程内存页是可写的，才会将子进程和父进程都设置为COW和只读的；否则，都是只读的，但是不标记为COW，因为本来就是只读的，不会进行写入
-    // 如果不这样做，父进程内存只读的时候，标记为COW，那么经过缺页中断，程序就可以写入数据，于原本的不符合
-    if (*pte & PTE_W) {
-      // set PTE_W to 0
-      *pte &= ~PTE_W;
-      // set PTE_RSW to 1
-      // set COW page
-      *pte |= PTE_RSW;
-    }
+
+    // --- COW 核心修改 ---
+    // 1. 将父进程的 PTE 标记为只读和 COW 页面
+    //    首先清除可写位 PTE_W
+    *pte &= ~PTE_W;
+    //    然后设置 COW 标志位 (这里用的是 RSW 的其中一位，这是一个技巧)
+    *pte |= PTE_RSW;
+    
+    // 获取父进程物理页的地址
     pa = PTE2PA(*pte);
 
-    // increment the ref count
+    // 2. 增加物理页的引用计数
     acquire(&ref_count_lock);
     useReference[pa/PGSIZE] += 1;
     release(&ref_count_lock);
 
+    // 3. 将父进程的物理页映射到子进程的页表中
+    //    注意：这里映射时也标记为只读和 COW，权限与父进程的 PTE 保持一致
     flags = PTE_FLAGS(*pte);
-    // if((mem = kalloc()) == 0)
-    //   goto err;
-    // memmove(mem, (char*)pa, PGSIZE);
     if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
-      // kfree(mem);
       goto err;
     }
   }
   return 0;
 
  err:
+  // 如果出错，需要取消已经完成的映射和引用计数增加
   uvmunmap(new, 0, i / PGSIZE, 1);
   return -1;
 }

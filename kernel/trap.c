@@ -70,15 +70,16 @@ usertrap(void)
 
     syscall();
   } else if(r_scause() == 15){
-    // Store/AMO page fault(write page fault)
-    // see Volume II: RISC-V Privileged Architectures V20211203 Page 71
-
-    // the faulting virtual address
-    // see Volume II: RISC-V Privileged Architectures V20211203 Page 70
-    // the download url is https://github.com/riscv/riscv-isa-manual/releases/download/Priv-v1.12/riscv-privileged-20211203.pdf
+    // --- COW 核心修改 ---
+    // 捕获写缺页中断 (Store/AMO page fault, scause = 15)
+    
+    // 从 stval 寄存器获取导致缺页中断的虚拟地址
     uint64 va = r_stval();
+    // 如果地址超出进程范围，则终止进程
     if (va >= p->sz)
       p->killed = 1;
+    
+    // 调用 COW 缺页中断处理函数
     int ret = cowhandler(p->pagetable, va);
     if (ret != 0)
       p->killed = 1;
@@ -244,24 +245,31 @@ cowhandler(pagetable_t pagetable, uint64 va)
     pte_t *pte = walk(pagetable, va, 0);
     if (pte == 0)
       return -1;
-    // check the PTE
+
+    // 检查 PTE，确认这是一个 COW 页面引发的缺页中断
     if ((*pte & PTE_RSW) == 0 || (*pte & PTE_U) == 0 || (*pte & PTE_V) == 0) {
       return -1;
     }
+
+    // 1. 分配一个新的物理页面
     if ((mem = kalloc()) == 0) {
       return -1;
     }
-    // old physical address
+
+    // 获取旧的（共享的）物理页地址
     uint64 pa = PTE2PA(*pte);
-    // copy old data to new mem
+    // 2. 将旧页面的内容完整拷贝到新分配的页面中
     memmove((char*)mem, (char*)pa, PGSIZE);
-    // PAY ATTENTION
-    // decrease the reference count of old memory page, because a new page has been allocated
+    
+    // 3. 释放对旧页面的引用
+    // kfree 会将引用计数减1，如果计数为0则真正释放
     kfree((void*)pa);
+
+    // 4. 更新页表项(PTE)
     uint flags = PTE_FLAGS(*pte);
-    // set PTE_W to 1, change the address pointed to by PTE to new memory page(mem)
+    // 将 PTE 映射到新的物理页，并设置可写权限(PTE_W)
     *pte = (PA2PTE(mem) | flags | PTE_W);
-    // set PTE_RSW to 0
+    // 清除 COW 标志位，因为它现在是私有的、可写的页面了
     *pte &= ~PTE_RSW;
     return 0;
 }
