@@ -5,10 +5,10 @@ user/_sysinfotest：     文件格式 elf64-littleriscv
 Disassembly of section .text:
 
 0000000000000000 <sinfo>:
-#include "kernel/sysinfo.h"
 #include "user/user.h"
 
 
+// 测试 sysinfo 系统调用是否能被成功调用
 void
 sinfo(struct sysinfo *info) {
    0:	1141                	addi	sp,sp,-16
@@ -38,9 +38,9 @@ sinfo(struct sysinfo *info) {
   32:	580080e7          	jalr	1408(ra) # 5ae <exit>
 
 0000000000000036 <countfree>:
-//
-// use sbrk() to count how many free physical memory pages there are.
-//
+
+// 通过不断申请内存，耗尽所有空闲内存，
+// 以此来测试 sysinfo 返回的 freemem 是否正确。
 int
 countfree()
 {
@@ -117,6 +117,7 @@ countfree()
 
 00000000000000c0 <testmem>:
 
+// 测试 freemem 字段的准确性
 void
 testmem() {
   c0:	7179                	addi	sp,sp,-48
@@ -245,6 +246,7 @@ testmem() {
 
 00000000000001c8 <testcall>:
 
+// 测试 sysinfo 能否处理无效的用户指针
 void
 testcall() {
  1c8:	1101                	addi	sp,sp,-32
@@ -298,6 +300,7 @@ testcall() {
 
 0000000000000232 <testproc>:
 
+// 测试 nproc 字段的准确性
 void testproc() {
  232:	7139                	addi	sp,sp,-64
  234:	fc06                	sd	ra,56(sp)
@@ -391,6 +394,7 @@ void testproc() {
 
 00000000000002f6 <main>:
 
+// 主函数，依次执行所有测试
 int
 main(int argc, char *argv[])
 {
@@ -403,13 +407,13 @@ main(int argc, char *argv[])
  302:	90250513          	addi	a0,a0,-1790 # c00 <malloc+0x20c>
  306:	00000097          	auipc	ra,0x0
  30a:	630080e7          	jalr	1584(ra) # 936 <printf>
-  testcall();
+  testcall(); // 测试无效参数
  30e:	00000097          	auipc	ra,0x0
  312:	eba080e7          	jalr	-326(ra) # 1c8 <testcall>
-  testmem();
+  testmem();  // 测试 freemem
  316:	00000097          	auipc	ra,0x0
  31a:	daa080e7          	jalr	-598(ra) # c0 <testmem>
-  testproc();
+  testproc(); // 测试 nproc
  31e:	00000097          	auipc	ra,0x0
  322:	f14080e7          	jalr	-236(ra) # 232 <testproc>
   printf("sysinfotest: OK\n");

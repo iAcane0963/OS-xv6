@@ -18,9 +18,11 @@ main(int argc, char *argv[])
    8:	e24a                	sd	s2,256(sp)
    a:	1200                	addi	s0,sp,288
    c:	892e                	mv	s2,a1
-  int i;
-  char *nargv[MAXARG];
+  char *nargv[MAXARG]; // 用于存储要执行的新命令及其参数
 
+  // 检查命令行参数是否正确
+  // 正确用法: trace <mask> <command> [args]
+  // argc 至少为 3 (trace, mask, command)
   if(argc < 3 || (argv[1][0] < '0' || argv[1][0] > '9')){
    e:	4789                	li	a5,2
   10:	00a7dd63          	bge	a5,a0,2a <main+0x2a>
@@ -44,6 +46,7 @@ main(int argc, char *argv[])
   46:	2ec080e7          	jalr	748(ra) # 32e <exit>
   }
 
+  // 调用 trace 系统调用，将字符串形式的掩码转换为整数后传入内核。
   if (trace(atoi(argv[1])) < 0) {
   4a:	00000097          	auipc	ra,0x0
   4e:	1e8080e7          	jalr	488(ra) # 232 <atoi>
@@ -58,10 +61,10 @@ main(int argc, char *argv[])
   6e:	068e                	slli	a3,a3,0x3
   70:	96be                	add	a3,a3,a5
   72:	10090913          	addi	s2,s2,256
-    fprintf(2, "%s: trace failed\n", argv[0]);
-    exit(1);
-  }
   
+  // 准备传递给 exec 的参数数组 nargv
+  // 例如，如果命令是 "trace 2 grep hello README", 
+  // 那么 nargv 将会是 {"grep", "hello", "README", 0}
   for(i = 2; i < argc && i < MAXARG; i++){
     nargv[i-2] = argv[i];
   76:	6390                	ld	a2,0(a5)
@@ -72,6 +75,8 @@ main(int argc, char *argv[])
   80:	0721                	addi	a4,a4,8
   82:	ff279ae3          	bne	a5,s2,76 <main+0x76>
   }
+  // exec 执行新的命令。因为 exec 会重用当前进程的 proc 结构体，
+  // 所以我们设置的 tracemask 会被继承，从而实现对新命令的追踪。
   exec(nargv[0], nargv);
   86:	ee040593          	addi	a1,s0,-288
   8a:	ee043503          	ld	a0,-288(s0)

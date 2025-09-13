@@ -120,6 +120,10 @@ found:
   p->pid = allocpid();
   p->state = USED;
 
+  // 为 trace 实验进行的修改：
+  // 初始化进程的追踪掩码为0，确保新进程不会意外继承旧的掩码。
+  p->tracemask = 0;
+
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -291,7 +295,11 @@ fork(void)
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
+
+  // 为 trace 实验进行的修改：
+  // 将父进程的追踪掩码复制给子进程，这样 `trace` 命令的效果可以延续到子进程。
   np->tracemask = p->tracemask;
+
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
 
@@ -655,7 +663,7 @@ procdump(void)
   }
 }
 
-// Return the number of non-UNUSED procs in the process table.
+// 为 sysinfo 系统调用提供辅助功能：计算当前状态不是 UNUSED 的进程总数。
 int getnproc(void)
 {
   struct proc *p;

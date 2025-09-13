@@ -104,9 +104,12 @@ uint64
 sys_trace(void)
 {
   int mask;
-  argint(0, &mask); // 从用户空间获取 trace 参数
-  myproc()->tracemask = mask; // 将 trace 参数保存到当前进程的进程控制块中
-  return 0; // 返回 0 表示系统调用执行成功
+  // 从用户空间获取第一个参数（掩码）并存入 mask 变量。
+  argint(0, &mask);
+  // 将获取到的掩码保存到当前进程的 tracemask 字段中。
+  myproc()->tracemask = mask;
+  // 返回0，代表系统调用成功。
+  return 0;
 }
 
 uint64
@@ -114,11 +117,16 @@ sys_sysinfo(void)
 {
   struct proc *p = myproc();
   struct sysinfo st;
-  uint64 addr; // user pointer to struct stat
+  uint64 addr; // 用于存储用户传入的、指向 sysinfo 结构体的指针
+
+  // 调用辅助函数，获取空闲内存和进程数，并填充到内核的结构体中
   st.freemem = getfreemem();
   st.nproc = getnproc();
+
+  // 获取用户传入的地址参数
   if (argaddr(0, &addr) < 0)
       return -1;
+  // 将内核中准备好的结构体内容，拷贝到用户空间指定的地址
   if (copyout(p->pagetable, addr, (char *)&st, sizeof(st)) < 0)
       return -1;
   return 0;

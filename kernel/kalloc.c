@@ -81,18 +81,20 @@ kalloc(void)
   return (void*)r;
 }
 
-// Return the amount of free memory.
+// 为 sysinfo 系统调用提供辅助功能：计算当前空闲的物理内存总量。
 int getfreemem(void)
 {
   int count = 0;
   struct run *r;
   acquire(&kmem.lock);
   r = kmem.freelist;
+  // 遍历空闲链表，计算有多少个空闲页。
   while (r)
   {
     count++;
     r = r->next;
   }
   release(&kmem.lock);
+  // 返回总的空闲字节数。
   return count * PGSIZE;
 }

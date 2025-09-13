@@ -4,6 +4,7 @@
 #include "user/user.h"
 
 
+// 测试 sysinfo 系统调用是否能被成功调用
 void
 sinfo(struct sysinfo *info) {
   if (sysinfo(info) < 0) {
@@ -12,9 +13,8 @@ sinfo(struct sysinfo *info) {
   }
 }
 
-//
-// use sbrk() to count how many free physical memory pages there are.
-//
+// 通过不断申请内存，耗尽所有空闲内存，
+// 以此来测试 sysinfo 返回的 freemem 是否正确。
 int
 countfree()
 {
@@ -38,6 +38,7 @@ countfree()
   return n;
 }
 
+// 测试 freemem 字段的准确性
 void
 testmem() {
   struct sysinfo info;
@@ -75,6 +76,7 @@ testmem() {
   }
 }
 
+// 测试 sysinfo 能否处理无效的用户指针
 void
 testcall() {
   struct sysinfo info;
@@ -90,6 +92,7 @@ testcall() {
   }
 }
 
+// 测试 nproc 字段的准确性
 void testproc() {
   struct sysinfo info;
   uint64 nproc;
@@ -120,13 +123,15 @@ void testproc() {
   }
 }
 
+// 主函数，依次执行所有测试
 int
 main(int argc, char *argv[])
 {
   printf("sysinfotest: start\n");
-  testcall();
-  testmem();
-  testproc();
+  testcall(); // 测试无效参数
+  testmem();  // 测试 freemem
+  testproc(); // 测试 nproc
   printf("sysinfotest: OK\n");
   exit(0);
 }
+

@@ -106,5 +106,7 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
+  // 为 syscall trace 实验添加的字段。
+  // 每一个比特位对应一个系统调用编号。如果某位为1，则追踪对应的系统调用。
   int tracemask;
 };

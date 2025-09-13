@@ -166,11 +166,19 @@ syscall(void)
   int num;
   struct proc *p = myproc();
 
+  // 从 trapframe 的 a7 寄存器中获取系统调用编号
   num = p->trapframe->a7;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
+    // 如果调用号有效，则从分派表中调用对应的处理函数
     p->trapframe->a0 = syscalls[num]();
+
+    // --- trace 功能的核心实现 ---
+    // 检查当前进程的追踪掩码 tracemask 的第 num 位是否为1
+    // (p->tracemask >> num) 将第 num 位移动到最低位
+    // & 1 取出最低位的值
     if (p->tracemask >> num & 1)
     {
+      // 如果该位为1，则打印追踪信息
       printf("%d: syscall %s -> %d\n",
       p->pid, syscallnames[num], p->trapframe->a0);
     }
