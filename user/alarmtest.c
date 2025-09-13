@@ -29,29 +29,34 @@ main(int argc, char *argv[])
 
 volatile static int count;
 
+// 警报处理函数
 void
 periodic()
 {
   count = count + 1;
   printf("alarm!\n");
+  // 关键：处理函数执行完毕后，必须调用 sigreturn() 系统调用
+  // 来通知内核并恢复到被中断的程序点继续执行。
   sigreturn();
 }
 
-// tests whether the kernel calls
-// the alarm handler even a single time.
+// 测试0: 测试警报处理函数是否至少能被调用一次
 void
 test0()
 {
   int i;
   printf("test0 start\n");
   count = 0;
+  // 设置每2个ticks触发一次警报，处理函数为 periodic
   sigalarm(2, periodic);
+  // 执行一个大循环，等待 count 变量被 periodic 函数改变
   for(i = 0; i < 1000*500000; i++){
     if((i % 1000000) == 0)
       write(2, ".", 1);
     if(count > 0)
       break;
   }
+  // 关闭警报
   sigalarm(0, 0);
   if(count > 0){
     printf("test0 passed\n");
@@ -67,14 +72,8 @@ void __attribute__ ((noinline)) foo(int i, int *j) {
   *j += 1;
 }
 
-//
-// tests that the kernel calls the handler multiple times.
-//
-// tests that, when the handler returns, it returns to
-// the point in the program where the timer interrupt
-// occurred, with all registers holding the same values they
-// held when the interrupt occurred.
-//
+// 测试1: 测试处理函数能否被多次调用，以及从处理函数返回后，
+// 程序能否在正确的点、带着正确的寄存器状态继续执行。
 void
 test1()
 {
@@ -86,28 +85,22 @@ test1()
   j = 0;
   sigalarm(2, periodic);
   for(i = 0; i < 500000000; i++){
-    if(count >= 10)
+    if(count >= 10) // 等待处理函数被调用10次
       break;
     foo(i, &j);
   }
   if(count < 10){
     printf("\ntest1 failed: too few calls to the handler\n");
   } else if(i != j){
-    // the loop should have called foo() i times, and foo() should
-    // have incremented j once per call, so j should equal i.
-    // once possible source of errors is that the handler may
-    // return somewhere other than where the timer interrupt
-    // occurred; another is that that registers may not be
-    // restored correctly, causing i or j or the address ofj
-    // to get an incorrect value.
+    // 如果 i != j，说明从警报处理函数返回时，寄存器 i 或 j 的值没有被正确恢复
     printf("\ntest1 failed: foo() executed fewer times than it was called\n");
   } else {
     printf("test1 passed\n");
   }
 }
 
-//
-// tests that kernel does not allow reentrant alarm calls.
+// 测试2: 测试警报处理函数的不可重入性。
+// 即在一个警报处理函数执行期间，不应该再次进入警报处理函数。
 void
 test2()
 {
@@ -121,7 +114,9 @@ test2()
   }
   if (pid == 0) {
     count = 0;
+    // 设置一个执行时间很长的处理函数 slow_handler
     sigalarm(2, slow_handler);
+    // 等待，确保时钟中断会再次发生
     for(i = 0; i < 1000*500000; i++){
       if((i % 1000000) == 0)
         write(2, ".", 1);
@@ -140,18 +135,22 @@ test2()
   }
 }
 
+// 一个执行时间很长的处理函数
 void
 slow_handler()
 {
   count++;
   printf("alarm!\n");
+  // 如果 count > 1，说明处理函数被重入了，测试失败
   if (count > 1) {
     printf("test2 failed: alarm handler called more than once\n");
     exit(1);
   }
+  // 长循环，模拟耗时操作
   for (int i = 0; i < 1000*500000; i++) {
     asm volatile("nop"); // avoid compiler optimizing away loop
   }
   sigalarm(0, 0);
   sigreturn();
 }
+

@@ -106,9 +106,10 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
-  int alarminterval; // sys_sigalarm() alarm interval in ticks
-  int alarmticks; // sys_sigalarm() alarm interval in ticks
-  void (*alarmhandler)(); // sys_sigalarm() pointer to the alarm handler
-  struct trapframe alarmtrapframe; // for saving registers
-  int sigreturned;
+  // 为 alarm 实验添加的字段
+  int alarminterval;           // 警报间隔（以时钟中断的 tick 数为单位）
+  int alarmticks;              // 当前的 tick 计数
+  void (*alarmhandler)();      // 指向用户空间警报处理函数的指针
+  struct trapframe alarmtrapframe; // 用于保存触发警报时的 trapframe，以便恢复
+  int sigreturned;             // 标记，防止在警报处理函数执行期间再次触发警报
 };

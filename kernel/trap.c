@@ -79,15 +79,27 @@ usertrap(void)
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
   {
+    // --- alarm 功能的核心实现 ---
+    // 每次时钟中断，当前进程的 tick 计数器加1
     p->alarmticks += 1;
+    // 检查是否达到了触发警报的条件：
+    // 1. tick 计数器达到了设定的间隔
+    // 2. 警报功能是开启的 (interval > 0)
     if ((p->alarmticks >= p->alarminterval) && (p->alarminterval > 0))
     {
-      p->alarmticks = 0;
+      p->alarmticks = 0; // 重置 tick 计数器
+      // 检查上次的警报处理函数是否已执行完毕 (通过 sigreturn 系统调用设置该标记)
+      // 这是为了防止在前一个处理函数还未结束时，重复进入处理函数（不可重入）
       if (p->sigreturned == 1)
       {
+        // 保存当前的 trapframe，以便 sigreturn 时可以恢复现场
         p->alarmtrapframe = *(p->trapframe);
+        // 修改 trapframe 中的程序计数器(epc)，使其指向用户空间的警报处理函数
         p->trapframe->epc = (uint64)p->alarmhandler;
+        // 设置标记，表示已进入警报处理状态，防止重入
         p->sigreturned = 0;
+        // 调用 usertrapret，它会根据修改后的 trapframe 返回到用户空间，
+        // 从而开始执行 alarmhandler 函数
         usertrapret();
       }
     }

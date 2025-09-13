@@ -121,7 +121,7 @@ panic(char *s)
   printf("panic: ");
   printf(s);
   printf("\n");
-  backtrace();
+  backtrace(); // 在 panic 时调用 backtrace 打印栈回溯信息
   panicked = 1; // freeze uart output from other CPUs
   for(;;)
     ;
@@ -134,12 +134,25 @@ printfinit(void)
   pr.locking = 1;
 }
 
+// 栈回溯函数
 void
 backtrace(void)
 {
+  // 获取当前的栈帧指针 (fp, a.k.a s0)
   uint64 fp_address = r_fp();
+
+  // xv6 的栈帧布局：
+  // [previous fp | ra      | saved regs ... ]
+  // fp ---------> ^
+  // fp-8 -------> ^ (返回地址 ra)
+  // fp-16 ------> ^ (上一个栈帧的 fp)
+
+  // 循环向上回溯栈帧，直到到达栈的最高处。
+  // PGROUNDDOWN(fp_address) 是当前栈页的基地址，当 fp 等于它时，说明已到栈顶。
   while(fp_address != PGROUNDDOWN(fp_address)) {
+    // 打印当前栈帧的返回地址 (ra)
     printf("%p\n", *(uint64*)(fp_address-8));
+    // 将 fp 更新为上一个栈帧的 fp，继续回溯
     fp_address = *(uint64*)(fp_address - 16);
   }
 }

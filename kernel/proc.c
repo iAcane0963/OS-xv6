@@ -141,10 +141,10 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
-  // Initialize alarmticks
-  p->alarmticks = 0;
-  p->alarminterval = 0;
-  p->sigreturned = 1;
+  // 为 alarm 实验进行的修改：初始化 alarm 相关字段
+  p->alarmticks = 0;      // tick 计数器清零
+  p->alarminterval = 0;   // 警报间隔设为0，表示默认不开启警报
+  p->sigreturned = 1;     // 初始状态为可触发警报
 
   return p;
 }
