@@ -321,35 +321,48 @@ sys_open(void)
     end_op();
     return -1;
   }
+
+  // --- 符号链接核心修改 ---
+  // 如果查找到的 inode 是一个符号链接
   if (ip->type == T_SYMLINK)
   {
+      // 检查是否设置了 O_NOFOLLOW 标志，如果设置了，则不跟随链接，直接返回（后续会打开这个链接文件本身）
       if ((omode & O_NOFOLLOW) == 0)
       {
           char target[MAXPATH];
-          int recursive_depth = 0;
+          int recursive_depth = 0; // 用于防止无限循环的递归深度计数器
+          // 循环处理，因为一个符号链接可能指向另一个符号链接
           while (1)
           {
+              // 设置一个最大递归深度（例如10），防止无限循环或过深的链接
               if (recursive_depth >= 10)
               {
                   iunlockput(ip);
                   end_op();
                   return -1;
               }
-              if (readi(ip, 0, (uint64)target, ip->size-MAXPATH, MAXPATH) != MAXPATH)
+              // 读取符号链接文件的内容，即目标路径
+              if (readi(ip, 0, (uint64)target, 0, MAXPATH) < 0)
               {
+                  iunlockput(ip);
+                  end_op();
                   return -1;
               }
+              // 释放当前 inode，准备用新路径重新查找
               iunlockput(ip);
+              // 使用目标路径 target 重新开始查找 inode
               if ((ip = namei(target)) == 0)
               {
                   end_op();
                   return -1;
               }
               ilock(ip);
+              // 如果新找到的 inode 不是符号链接，则查找结束，跳出循环
               if (ip->type != T_SYMLINK)
               {
                   break;
               }
+              // 如果仍然是符号链接，则增加递归深度，继续循环
               recursive_depth++;
           }
       }
@@ -523,23 +536,26 @@ uint64 sys_symlink(void)
     char target[MAXPATH], path[MAXPATH];
     struct inode *ip;
 
+    // 获取用户传入的两个参数：目标路径 target 和符号链接路径 path
     if (argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
     {
         return -1;
     }
 
     begin_op();
-
-    if ((ip = namei(path)) == 0)
+    // 尝试创建 T_SYMLINK 类型的新文件
+    // create 函数会处理路径查找、分配 inode 等逻辑
+    if ((ip = create(path, T_SYMLINK, 0, 0)) == 0)
     {
-        ip = create(path, T_SYMLINK, 0, 0);
-        iunlock(ip);
+        end_op();
+        return -1;
     }
 
-    ilock(ip);
-
-    if (writei(ip, 0, (uint64)target, ip->size, MAXPATH) != MAXPATH)
+    // 将目标路径 target 作为符号链接文件的内容写入
+    if (writei(ip, 0, (uint64)target, 0, MAXPATH) < 0)
     {
+        iunlockput(ip);
+        end_op();
         return -1;
     }
 

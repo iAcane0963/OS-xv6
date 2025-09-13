@@ -27,7 +27,8 @@ struct superblock {
 #define NDIRECT 11
 #define NINDIRECT (BSIZE / sizeof(uint))
 #define NDOUBLYINDIRECT (NINDIRECT * NINDIRECT)
-#define MAXFILE (NDIRECT + NINDIRECT + NDOUBLYINDIRECT) // lab9-1
+// 为支持大文件进行的修改：最大文件块数现在包括了双重间接块
+#define MAXFILE (NDIRECT + NINDIRECT + NDOUBLYINDIRECT)
 
 // On-disk inode structure
 struct dinode {
@@ -36,6 +37,7 @@ struct dinode {
   short minor;          // Minor device number (T_DEVICE only)
   short nlink;          // Number of links to inode in file system
   uint size;            // Size of file (bytes)
+  // 为支持大文件进行的修改：地址数组增加一位，用于存放双重间接块的地址
   uint addrs[NDIRECT+2];   // Data block addresses
 };
 
