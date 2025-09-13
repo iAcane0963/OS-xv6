@@ -433,8 +433,6 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
-// A function that prints the contents of a page table.
-
 // 递归打印页表内容的辅助函数
 // pagetable: 要打印的页表的根地址
 // depth: 当前递归的深度，用于打印缩进
@@ -483,10 +481,3 @@ vmprint(pagetable_t pagetable)
   vmprintwalk(pagetable, 1); // 开始递归打印，初始深度为1
 }
 
-
-void
-vmprint(pagetable_t pagetable)
-{
-  printf("page table %p\n",pagetable);
-  vmprintwalk(pagetable,1);
-}
