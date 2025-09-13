@@ -435,26 +435,54 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 
 // A function that prints the contents of a page table.
 
+// 递归打印页表内容的辅助函数
+// pagetable: 要打印的页表的根地址
+// depth: 当前递归的深度，用于打印缩进
 void
 vmprintwalk(pagetable_t pagetable, int depth)
 {
-  // there are 2^9 = 512 PTEs in a page table.
+  // RISC-V 的页表是一个包含 512 个页表条目(PTE)的数组
   for(int i = 0; i < 512; i++){
     pte_t pte = pagetable[i];
+    
+    // 检查 PTE 是否有效 (PTE_V 位)
+    // 并且检查它是否是一个指向下一级页表的内部节点
+    // (内部节点的 R, W, X 位都为 0)
     if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0){
-      // this PTE points to a lower-level page table.
+      // 这是一个内部节点，指向下一级页表
+      
+      // 打印缩进，表示层级关系
       for (int n = 0; n < depth; n++)
         printf(" ..");
+      
+      // 打印当前 PTE 的索引、PTE自身的值、以及它指向的下一级页表的物理地址
       printf("%d: pte %p pa %p\n", i, pte, PTE2PA(pte));
+      
+      // 获取下一级页表的物理地址并递归调用
       uint64 child = PTE2PA(pte);
       vmprintwalk((pagetable_t)child, depth+1);
     } else if(pte & PTE_V){
+      // 这是一个叶子节点，直接映射到物理内存页
+      
+      // 打印缩进
       for (int n = 0; n < depth; n++)
         printf(" ..");
+      
+      // 打印当前 PTE 的索引、PTE自身的值、以及它映射的物理页的地址
       printf("%d: pte %p pa %p\n", i, pte, PTE2PA(pte));
     }
+    // 如果 pte 无效 (PTE_V 位为0)，则不打印
   }
 }
+
+// 打印页表内容的入口函数
+void
+vmprint(pagetable_t pagetable)
+{
+  printf("page table %p\n", pagetable); // 首先打印页表的根地址
+  vmprintwalk(pagetable, 1); // 开始递归打印，初始深度为1
+}
+
 
 void
 vmprint(pagetable_t pagetable)

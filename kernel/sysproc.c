@@ -78,41 +78,58 @@ sys_sleep(void)
 
 #ifdef LAB_PGTBL
 extern pte_t *walk(pagetable_t, uint64, int);
+
+// pgaccess 系统调用的内核实现
 int
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
-  uint64 srcva, st;
-  int len;
-  uint64 buf = 0;
+  uint64 srcva; // 用户传入的起始虚拟地址
+  uint64 st;    // 用户传入的、用于存储结果的地址
+  int len;      // 用户传入的、要检查的页面数量
+  uint64 buf = 0; // 内核中的缓冲区，用于构建访问位的掩码
   struct proc *p = myproc();
 
+  // 锁住当前进程，防止在检查页表时，页表被其他地方修改（例如由其他线程）
   acquire(&p->lock);
 
-  argaddr(0, &srcva);
-  argint(1, &len);
-  argaddr(2, &st);
-  if ((len > 64) || (len < 1))
+  // 从用户空间获取参数
+  argaddr(0, &srcva); // 第一个参数：起始虚拟地址
+  argint(1, &len);    // 第二个参数：要检查的页面数量
+  argaddr(2, &st);    // 第三个参数：存储结果的地址
+
+  // 检查页面数量是否在有效范围内（实验要求最多32，但这里是64，也合理）
+  if ((len > 64) || (len < 1)){
+    release(&p->lock);
     return -1;
+  }
+
   pte_t *pte;
+  // 循环检查每个页面
   for (int i = 0; i < len; i++)
   {
+    // 使用 walk 函数找到对应虚拟地址的 PTE (页表条目)
     pte = walk(p->pagetable, srcva + i * PGSIZE, 0);
-    if(pte == 0){
+    
+    // 检查PTE的有效性
+    if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0){
+      // 如果页不存在(walk返回0)，或PTE无效(V=0)，或不是用户页(U=0)，则出错
+      release(&p->lock);
       return -1;
     }
-    if((*pte & PTE_V) == 0){
-      return -1;
-    }
-    if((*pte & PTE_U) == 0){
-      return -1;
-    }
+
+    // 检查 PTE_A (Accessed) 访问位
     if(*pte & PTE_A){
+      // 如果该页被访问过 (PTE_A == 1)
+      // 1. 清除访问位，以便下次可以重新检测
       *pte = *pte & ~PTE_A;
+      // 2. 在我们的结果掩码 buf 的对应位上置 1
       buf |= (1 << i);
     }
   }
   release(&p->lock);
+
+  // 将包含结果的 buf 拷贝回用户空间指定的地址 st
+  // 注意拷贝的长度，因为 buf 是 uint64，所以根据 len 决定拷贝 1 到 8 个字节
   copyout(p->pagetable, st, (char *)&buf, ((len -1) / 8) + 1);
   return 0;
 }
